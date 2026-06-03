@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -27,6 +29,20 @@ app.add_middleware(
 app.include_router(products.router)
 app.include_router(customers.router)
 app.include_router(orders.router)
+
+
+@app.on_event("startup")
+def startup_log():
+    print("=" * 50)
+    print("APP STARTED")
+    print("PORT =", os.getenv("PORT"))
+    print("=" * 50)
+
+
+@app.get("/ping")
+def ping():
+    print("PING REQUEST RECEIVED")
+    return {"message": "pong"}
 
 
 @app.get("/")
