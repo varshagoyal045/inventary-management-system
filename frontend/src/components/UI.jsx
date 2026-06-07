@@ -47,6 +47,7 @@ export function FormField({
   onChange,
   error,
   required,
+  children,
   ...props
 }) {
   return (
@@ -63,6 +64,15 @@ export function FormField({
           onChange={onChange}
           {...props}
         />
+      ) : type === 'select' ? (
+        <select
+          className="input"
+          value={value}
+          onChange={onChange}
+          {...props}
+        >
+          {children}
+        </select>
       ) : (
         <input
           type={type}

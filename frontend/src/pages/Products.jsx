@@ -10,7 +10,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { getProducts } from '../api'
+import { getProducts, createProduct, deleteProduct } from '../api'
 import {
   Button,
   FormField,
@@ -23,67 +23,10 @@ import {
 } from '../components/UI'
 import { useToast } from '../App'
 
-// Mock data for demonstration
-const mockProducts = [
-  {
-    id: 1,
-    name: '27" Ultra HD Monitor',
-    sku: 'MON-27-UHD',
-    category: 'Electronics',
-    price: 299.99,
-    stock: 45,
-    status: 'active',
-    image:
-      'https://images.unsplash.com/photo-1527864550417-7fd231fc5205?w=200',
-  },
-  {
-    id: 2,
-    name: 'Wireless Mouse Pro',
-    sku: 'MOU-WIR-PRO',
-    category: 'Accessories',
-    price: 49.99,
-    stock: 234,
-    status: 'active',
-    image:
-      'https://images.unsplash.com/photo-1527814050087-3793815479db?w=200',
-  },
-  {
-    id: 3,
-    name: 'Mechanical Keyboard',
-    sku: 'KEY-MEC-RGB',
-    category: 'Accessories',
-    price: 129.99,
-    stock: 89,
-    status: 'active',
-    image:
-      'https://images.unsplash.com/photo-1587829191301-4e347b4abd1f?w=200',
-  },
-  {
-    id: 4,
-    name: 'USB-C Hub',
-    sku: 'HUB-USB-C',
-    category: 'Accessories',
-    price: 79.99,
-    stock: 5,
-    status: 'low_stock',
-    image:
-      'https://images.unsplash.com/photo-1625948515291-69613efd103f?w=200',
-  },
-  {
-    id: 5,
-    name: 'External SSD 1TB',
-    sku: 'SSD-EXT-1T',
-    category: 'Storage',
-    price: 89.99,
-    stock: 0,
-    status: 'inactive',
-    image:
-      'https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=200',
-  },
-]
+// products are loaded from backend
 
 export default function Products() {
-  const [products, setProducts] = useState(mockProducts)
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedProducts, setSelectedProducts] = useState([])
@@ -96,10 +39,31 @@ export default function Products() {
     sku: '',
     category: '',
     price: '',
-    stock: '',
+    quantity: '',
   })
   const showToast = useToast()
   const perPage = 10
+
+  useEffect(() => {
+    let mounted = true
+    const fetchProducts = async () => {
+      setLoading(true)
+      try {
+        const res = await getProducts()
+        console.log('Products response:', res)
+        if (mounted) setProducts(Array.isArray(res.data) ? res.data : [])
+      } catch (err) {
+        console.error('Failed to load products:', err)
+        showToast('Failed to load products', 'error')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    fetchProducts()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // Filter and search products
   const filtered = products.filter((p) => {
@@ -136,28 +100,48 @@ export default function Products() {
   }
 
   const handleAddProduct = () => {
+    console.log('handleAddProduct called', newProduct)
     if (!newProduct.name || !newProduct.sku) {
       showToast('Please fill in all required fields', 'error')
       return
     }
-    const product = {
-      id: Math.max(...products.map((p) => p.id), 0) + 1,
-      ...newProduct,
-      price: parseFloat(newProduct.price),
-      stock: parseInt(newProduct.stock),
-      status: 'active',
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200',
-    }
-    setProducts([...products, product])
-    setNewProduct({ name: '', sku: '', category: '', price: '', stock: '' })
-    setShowAddModal(false)
-    showToast('Product added successfully', 'success')
+    ;(async () => {
+      setLoading(true)
+      try {
+        const payload = {
+          ...newProduct,
+          price: parseFloat(newProduct.price || 0),
+          quantity: parseInt(newProduct.quantity || 0, 10),
+        }
+        await createProduct(payload)
+        const res = await getProducts()
+        setProducts(Array.isArray(res.data) ? res.data : [])
+        setNewProduct({ name: '', sku: '', category: '', price: '', quantity: '' })
+        setShowAddModal(false)
+        showToast('Product added successfully', 'success')
+      } catch (err) {
+        showToast('Failed to add product', 'error')
+      } finally {
+        setLoading(false)
+      }
+    })()
   }
 
   const handleDeleteSelected = () => {
-    setProducts(products.filter((p) => !selectedProducts.includes(p.id)))
-    setSelectedProducts([])
-    showToast(`${selectedProducts.length} products deleted`, 'success')
+    ;(async () => {
+      setLoading(true)
+      try {
+        await Promise.all(selectedProducts.map((id) => deleteProduct(id)))
+        const res = await getProducts()
+        setProducts(Array.isArray(res.data) ? res.data : [])
+        setSelectedProducts([])
+        showToast(`${selectedProducts.length} products deleted`, 'success')
+      } catch (err) {
+        showToast('Failed to delete products', 'error')
+      } finally {
+        setLoading(false)
+      }
+    })()
   }
 
   const handleExportCSV = () => {
@@ -171,7 +155,7 @@ export default function Products() {
           p.sku,
           p.category,
           p.price,
-          p.stock,
+          p.quantity,
           p.status,
         ].join(',')
       ),
@@ -250,18 +234,18 @@ export default function Products() {
       ),
     },
     {
-      key: 'stock',
+      key: 'quantity',
       label: 'Stock',
       width: '100px',
       render: (row) => (
         <div className="flex items-center gap-2">
           <span className="font-medium text-gray-900 dark:text-white">
-            {row.stock}
+            {row.quantity}
           </span>
-          {row.stock < 20 && row.stock > 0 && (
+          {row.quantity < 20 && row.quantity > 0 && (
             <Badge variant="warning">Low</Badge>
           )}
-          {row.stock === 0 && (
+          {row.quantity === 0 && (
             <Badge variant="danger">Out</Badge>
           )}
         </div>
@@ -406,7 +390,7 @@ export default function Products() {
         open={showAddModal}
         onClose={() => {
           setShowAddModal(false)
-          setNewProduct({ name: '', sku: '', category: '', price: '', stock: '' })
+          setNewProduct({ name: '', sku: '', category: '', price: '', quantity: '' })
         }}
         title="Add New Product"
         size="md"
@@ -458,9 +442,9 @@ export default function Products() {
             label="Stock"
             type="number"
             placeholder="0"
-            value={newProduct.stock}
+            value={newProduct.quantity}
             onChange={(e) =>
-              setNewProduct({ ...newProduct, stock: e.target.value })
+              setNewProduct({ ...newProduct, quantity: e.target.value })
             }
             required
           />

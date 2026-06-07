@@ -18,6 +18,7 @@ import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Customers from './pages/Customers'
 import Orders from './pages/Orders'
+import ErrorBoundary from './components/ErrorBoundary'
 
 // Toast context
 export const ToastCtx = createContext(null)
@@ -221,12 +222,14 @@ export default function App() {
               setDarkMode={setDarkMode}
             />
             <main className="mt-16 min-h-screen bg-gray-50 dark:bg-gray-950">
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/customers" element={<Customers />} />
-                <Route path="/orders" element={<Orders />} />
-              </Routes>
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/customers" element={<Customers />} />
+                  <Route path="/orders" element={<Orders />} />
+                </Routes>
+              </ErrorBoundary>
             </main>
           </div>
         </div>
